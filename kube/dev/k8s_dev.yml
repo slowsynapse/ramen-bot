@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spicebot-dev
+  namespace: spicebot-dev
+  labels:
+    app: spicebot-dev
+spec:
+  selector:
+    app: spicebot-dev
+  type: NodePort
+  ports:
+    - name: backend-dev
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spicebot-dev
+  namespace: spicebot-dev
+  labels:
+    app: spicebot-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spicebot-dev
+  template:
+    metadata:
+      labels:
+        app: spicebot-dev
+    spec:
+      containers:
+        - name: spicebot
+          image: gcr.io/spice-slp-token/spicebot-dev:0.0.5
+          env:
+            - name: DEPLOYMENT_INSTANCE
+              value: dev
+            - name: POSTGRES_DB
+              value: spicebot-dev
+            - name: POSTGRES_HOST
+              value: 127.0.0.1
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials-dev
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-db-credentials-dev
+                  key: password
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials-dev
+                  key: hostname
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials-dev
+                  key: password
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials-dev
+                  key: port
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: telegrambottoken
+            - name: TELEGRAM_BOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: telegrambotuser
+            - name: TWITTER_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: twitterconsumerkey
+            - name: TWITTER_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: twitterconsumersecret
+            - name: TWITTER_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: twitteraccesskey
+            - name: TWITTER_ACCESS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: twitteraccesssecret
+            - name: TWITTER_BOT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: twitterbotname
+            - name: SPICE_TOKEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: spicetokenid
+            - name: SPICE_FUNDING_SLP_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: spicefundingslpaddr
+            - name: SPICE_FUNDING_CASH_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: spicefundingcashaddr
+            - name: SPICE_FUNDING_WIF
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: spicefundingwif
+            - name: FAUCET_SLP_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: faucetslpaddr
+            - name: FAUCET_CASH_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: faucetcashaddr
+            - name: FAUCET_WIF
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: faucetwif
+            - name: RECAPTCHA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: recaptchasecret
+            - name: PARENT_XPUBKEY
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: parentxpubkey
+            - name: BCH_FEE_FUNDING_SLP_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: bchfeefundingslpaddress
+            - name: BCH_FEE_FUNDING_CASH_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: bchfeefundingcashaddress
+            - name: BCH_FEE_FUNDING_WIF
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: bchfeefundingwif
+            - name: REDDIT_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: redditclientid
+            - name: REDDIT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: redditclientsecret
+            - name: REDDIT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: redditusername
+            - name: REDDIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: redditpassword
+            - name: REDDIT_USER_AGENT
+              valueFrom:
+                secretKeyRef:
+                  name: other-credentials-dev
+                  key: reddituseragent
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.11
+          command:
+            [
+              "/cloud_sql_proxy",
+              "-instances=spice-slp-token:us-central1:spicebot=tcp:5432",
+              "-credential_file=/secrets/cloudsql/credentials.json",
+            ]
+          volumeMounts:
+            - name: cloudsql-instance-credentials-dev
+              mountPath: /secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: cloudsql-instance-credentials-dev
+          secret:
+            secretName: cloudsql-instance-credentials-dev

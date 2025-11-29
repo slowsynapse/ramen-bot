@@ -1,0 +1,24 @@
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <meta name="keywords" content="keyword 1, keyword 2"/>
+        <meta property="og:title" name="title" content="Spice Feed"/>
+        <meta property="og:description" name="description" content="{{ total_tips }} SPICE | {{ tipped_user_name }} - The Spice Must Flow."/>
+        {% if media_type == 'photo' %}
+            <meta property="og:image" content="{{ original_message_mediapath }}"/>
+        {% elif media_type == 'video' %}
+            <meta property="og:image" content="https://spicebot-dev.scibizinformatics.com/static/img/spice-video.jpg"/>
+        {% endif %}
+        <meta data-hid="url" property="og:url" content="https://spicefeed-dev.scibizinformatics.com/details/{{ id }}">
+</head>
+<body>
+    <script>
+        (function() {
+        window.location.href = "https://spicefeed-dev.scibizinformatics.com/details/{{ id }}";
+        })();    
+    </script>
+</body>
+</html>
+
+

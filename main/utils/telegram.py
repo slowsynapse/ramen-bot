@@ -1,0 +1,635 @@
+import emoji
+import requests
+import logging
+import random
+import json
+import redis
+import os
+import re
+from datetime import datetime
+from django.utils import timezone
+from django.conf import settings
+from django.db.models import Sum
+
+from main.models import User, Content, Transaction, Withdrawal, TelegramGroup
+from main.tasks import send_telegram_message, withdraw_spice_tokens
+from .responses import get_response
+from .account import compute_balance
+from django.db import IntegrityError
+
+
+logger = logging.getLogger(__name__)
+
+
+def get_chat_admins(chat_id):
+    data = {
+        "chat_id": chat_id
+    }
+    url = 'https://api.telegram.org/bot'
+    response = requests.post(
+        f"{url}{settings.TELEGRAM_BOT_TOKEN}/getChatAdministrators", data=data
+    )
+    admins = []
+    if response.status_code == 200:
+        admins = [x['user']['id'] for x in response.json()['result']]
+    return admins
+
+
+def get_chat_members_count(chat_id):
+    data = {
+        "chat_id": chat_id
+    }
+    url = 'https://api.telegram.org/bot'
+    response = requests.post(
+        f"{url}{settings.TELEGRAM_BOT_TOKEN}/getChatMembersCount", data=data
+    )
+    count = 0
+    if response.status_code == 200:
+        count = response.json()['result']
+    return count
+
+class TelegramBotHandler(object):
+
+    def __init__(self, data):
+        self.data = data
+        self.update_id = None
+        self.message = None
+        self.dest_id = None
+        self.tip = False
+        self.tip_with_emoji =False
+
+
+    @staticmethod
+    def get_name(details):
+        name = details['first_name']
+        try:
+            name += ' ' + details['last_name']
+        except KeyError:
+            pass
+        if len(name) > 20:
+            name = name[0:20]
+        return name
+
+    
+    def compute_amount(self, text):
+        amount = 0
+        if text:
+            # Check if text only contains the allowed symbol and emoji
+            for i in settings.ALLOWED_SYMBOLS.keys():
+                if i == "\U0001F344":
+                    for x in range(text.count(i)):
+                        amount += random.choice(range(0,1000))                        
+                else:
+                    amount +=  settings.ALLOWED_SYMBOLS[i] * text.count(i)
+        return amount
+
+    def validate_address(self, text):
+        is_valid = False
+        if len(text) == 55 and text.startswith('simpleledger:'):
+            is_valid = True
+        return is_valid
+
+    def compute_POF(self, user, text):        
+        received = Content.objects.filter(recipient=user).aggregate(Sum('tip_amount'))
+        tipped = Content.objects.filter(sender=user).aggregate(Sum('tip_amount'))
+
+        received_amount_full = received['tip_amount__sum']
+        tipped_amount = tipped['tip_amount__sum']
+        if not received['tip_amount__sum']:
+            received_amount_full = 1 # Set to 1 to avoid division by zero error
+        if not tipped['tip_amount__sum']:
+            tipped_amount = 0
+
+        received_amount_half = received_amount_full / 2
+        pof_percentage = (tipped_amount/received_amount_full)*100
+        pof_rating = ((tipped_amount/received_amount_half)*100) / 20
+        
+        if pof_rating > 5:
+            pof_rating = 6
+
+        user.pof = {'pof_rating': pof_rating, 'pof_percentage': pof_percentage}
+        user.save()
+
+        return round(pof_percentage), round(pof_rating)        
+        
+
+    def handle_tipping(self, message, text, with_pof=False):
+        sender_telegram_id = message['from']['id']
+        sender, _ = User.objects.get_or_create(
+            telegram_id=sender_telegram_id
+        )
+        group = TelegramGroup.objects.get(chat_id=message["chat"]["id"])
+        # Udpate user details, in case of changes
+        sender.telegram_user_details = message['from']
+        sender.save()
+        from_username = sender.telegram_display_name or sender.telegram_username
+        to_username = None
+        to_firstname = None
+
+        recipient = None
+        recipient_content_id = None
+        content_id_json = None
+        parent = None
+        try:
+            if not message['reply_to_message']['from']['is_bot']:
+                self.recipient_telegram_id = message['reply_to_message']['from']['id']
+                recipient, _ = User.objects.get_or_create(
+                    telegram_id=self.recipient_telegram_id,
+                    telegram_user_details__is_bot=False
+                )
+                # Udpate user details, in case of changes
+                recipient.telegram_user_details = message['reply_to_message']['from']                
+                recipient.save()                
+                to_username = recipient.telegram_display_name or recipient.telegram_username
+                group.users.add(recipient)
+                group.save()
+            to_firstname = message['reply_to_message']['from']['username']               
+        except KeyError:
+            pass
+        
+        recipient_content_id = {
+            'chat_id': message['chat']['id'],
+            'message_id': message['reply_to_message']['message_id']
+        }
+
+        content_id_json = json.dumps(recipient_content_id)
+
+        #Getting parent tipper
+        if Content.objects.filter(recipient_content_id=content_id_json).exists():
+            content = Content.objects.filter(parent=None, recipient_content_id=content_id_json).first()
+            parent = content
+        
+        self.sender = sender
+        self.recipient = recipient
+
+        self.parent = parent
+        self.recipient_content_id = content_id_json
+        try:
+            self.tip_amount = 0
+            # Check if to_username is not equal to None         
+            if  to_username and to_firstname != settings.TELEGRAM_BOT_USER and from_username != to_username:                
+                if text.startswith('tip'):
+
+                    if not self.has_emoji(text):
+                        amount = text.split()[1].replace(',', '')
+                        if 'e' in amount:
+                            self.tip_amount = 0
+                        else:
+                            self.tip_amount = float(amount)
+
+                    
+                    amount = text.split()[1].replace(',', '')
+                    if 'e' in amount:
+                        self.tip_amount = 0
+                    else:
+                        self.tip_amount = float(amount)
+
+
+                elif ' spice' in text:
+                    amount = text.split(' spice')[0].split()[-1].replace(',', '')
+                    self.tip_amount = float(amount)
+
+
+                # Added plus symbol, hot pepper, thumbs up & fire emoji for tipping
+                else:
+
+                    if self.emoji_only(text):
+                        for i in settings.ALLOWED_SYMBOLS.keys():
+                            if str(i) in text:
+                                self.tip_amount = self.compute_amount(text)
+
+                    
+                    for i in settings.ALLOWED_SYMBOLS.keys():
+                        if str(i) in text:
+                            self.tip_amount = self.compute_amount(text)
+
+
+                one_satoshi = 0.00000001
+                if self.tip_amount >= one_satoshi:
+                    # Check if user has enough balance to give a tip
+                    balance = compute_balance(sender.id)
+                    if balance >= self.tip_amount:
+                        if self.tip_amount > 0:
+                            if self.tip_amount > 1:
+                                amount = '{:,}'.format(round(self.tip_amount, 8))
+                            else:
+                                amount = '{:,.8f}'.format(round(self.tip_amount, 8))
+                            amount_str = str(amount)
+                            if amount_str.endswith('.0'):
+                                amount_str = amount_str[:-2]
+                            if '.' in amount_str:
+                                amount_str = amount_str.rstrip('0')
+                            if amount_str.endswith('.'):
+                                amount_str = amount_str[:-1]
+                            if 'e' in amount_str:
+                                amount_str = "{:,.8f}".format(float(amount_str))
+
+                            self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001f336 SPICE \U0001f336 to <b>{to_username}</b>"
+
+                            #get pof
+                            pct_sender, pof_sender = self.compute_POF(sender, text)
+                            pct_receiver, pof_receiver = self.compute_POF(recipient,text)      
+                            
+                            #set of replies
+                            if text.count(' pof %') or text.count('pof % '):
+                                self.message = f"<b>{from_username}</b> (PoF <b>{pct_sender}</b>% {settings.POF_SYMBOLS[pof_sender]}) tipped {amount_str} \U0001f336 SPICE \U0001f336 to <b>{to_username}</b> (PoF <b>{pct_receiver}</b>% {settings.POF_SYMBOLS[pof_receiver]})"
+                            elif text.count(' pof') or text.count('pof '):
+                                self.message = f"<b>{from_username}</b> (PoF <b>{pof_sender}/5 {settings.POF_SYMBOLS[pof_sender]}</b>) tipped {amount_str} \U0001f336 SPICE \U0001f336 to <b>{to_username}</b> (PoF <b>{pof_receiver}/5 {settings.POF_SYMBOLS[pof_receiver]}</b>)"                            
+                            else:
+                                self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001f336 SPICE \U0001f336 to <b>{to_username}</b>"                            
+                    else:
+                        logger.info('Insufficient balance')
+                        # if not self.tip_with_emoji:
+                        self.message = f"<b>@{from_username}</b>, you don't have enough \U0001f336 SPICE \U0001f336!"
+                        self.tip = False
+                else:
+                    self.tip = False
+            # Prevent users from sending tips to bot
+            elif to_firstname == settings.TELEGRAM_BOT_USER: 
+                if message['chat']['type']  == 'private':        
+                    self.message = f"""To tip someone SPICE points reply to any of their messages with: 
+                                    \ntip [amount] \nExample: tip 200 
+                                    \nOR 
+                                    \n[amount] spice \nExample: 100 spice"""
+                self.tip = False
+        except ValueError:            
+            pass
+
+    def emoji_only(self, text):  
+        has_emoji = False  
+        has_others = False  
+
+        for char in text:  
+            if char in emoji.UNICODE_EMOJI or char == "+":  
+                has_emoji = True  
+            elif char not in emoji.UNICODE_EMOJI and char is not " ":  
+                has_others = True 
+
+        if has_emoji and not has_others: 
+            return True 
+        return False 
+
+    def has_emoji(self, text):
+        for char in text:
+            if char in emoji.UNICODE_EMOJI or char == "+":
+               return True
+        return False
+
+    def process_data(self):
+        text = ''
+        amount = None
+        addr = None
+        t_message = {}
+        entities = []
+        if 'message' in self.data.keys():
+            self.update_id = self.data['update_id']
+            t_message = self.data["message"]            
+            self.dest_id = t_message["chat"]["id"]
+            chat_type = t_message['chat']['type'] 
+            from_id = t_message['from']['id']
+            try:
+                text = t_message['text']
+            except KeyError:
+                pass
+            # Record user last activity
+            user, _ = User.objects.get_or_create(
+                telegram_id=from_id
+            )
+            user.last_activity = timezone.now()
+            user.save()
+            # Create chat/group if doesn't exist yet
+            if chat_type != 'private':
+                try:
+                    group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
+                    group.users.add(user)
+                    group.save()
+                except IntegrityError as exc:                    
+                    groups = TelegramGroup.objects.filter(chat_id=t_message["chat"]["id"])
+                    group_id = groups.first().id
+                    group = TelegramGroup.objects.get(id=group_id)
+                    group.users.add(user)
+                    group.save()
+                    if groups.count > 1:                        
+                        TelegramGroup.objects.exclude(id=group_id).delete()                        
+                    else:
+                        raise IntegrityError(exc)
+                except TelegramGroup.DoesNotExist:
+                    group, created = TelegramGroup.objects.get_or_create(
+                        chat_id=t_message["chat"]["id"]
+                    )
+                    if created:
+                        group.title = t_message["chat"]["title"]
+                        group.chat_type = t_message["chat"]["type"]
+                        group.save()
+                        
+                    else:
+                        TelegramGroup.objects.filter(id=group.id).update(
+                            title=t_message["chat"]["title"],
+                            chat_type = t_message["chat"]["type"]
+                        )
+                    group.users.add(user)
+                    group.save()
+
+            if not settings.REDISKV.sismember('telegram_msgs', self.update_id):
+                try:
+                    if text == '@' + settings.TELEGRAM_BOT_USER:
+                        # telegram_bot_id = settings.TELEGRAM_BOT_TOKEN.split(':')[0]
+                        # bot_url = 'tg://user?id=' + telegram_bot_id
+                        bot_url = 'https://t.me/' + settings.TELEGRAM_BOT_USER
+                        messages = array = [
+                            'Sup, if you want to learn how to push my buttons <a href="%s">DM me</a> homie.' % bot_url,
+                            'I can show you how to play with my doodads, but you have to <a href="%s">private message</a> me first.' % bot_url,
+                            'Yo! I heard you wanted to see me. Well here I am homeslice. \n\n<a href="%s">DM Me</a>, Let\'s talk.' % bot_url,
+                            'What\'s up? <a href="%s">Message Me</a>. Let\'s talk.' % bot_url,
+                            'We frens. <a href="%s">Message Me</a> so the normies aren\'t all up in our business.' % bot_url,
+                            'You Rang? Lets get spicy! <a href="%s">Message me</a> to learn the fun things we can do together!' % bot_url
+                        ]
+                        self.message = random.choice(messages)
+
+                except KeyError:
+                    pass
+
+        #rain feature here
+        msg =''
+        if text and chat_type != 'private':
+            group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
+            sender_telegram_id = t_message['from']['id']
+            sender, _ = User.objects.get_or_create(
+                telegram_id=sender_telegram_id
+            )
+            # Udpate user details, in case of changes
+            sender.telegram_user_details = t_message['from']
+            sender.save()
+
+            balance = compute_balance(sender.id)
+            msg = sender.rain(text, group.id, balance)
+
+        if msg is not '':
+            send_telegram_message.delay(msg, self.dest_id, self.update_id)
+
+        if text and msg is '':
+
+            try:
+                entities = t_message['entities']
+                for entity in entities:
+                    if entity['type'] == 'mention':
+                        if entity['offset'] == 0:
+                            mention = text[:entity['length']]
+                            text = text.replace(mention, '').strip()
+                            break
+                    elif entity['type'] == 'bot_command':
+                        if text.startswith('/'):
+                            bot_user = '@' + settings.TELEGRAM_BOT_USER
+                            text = text.replace(bot_user, '').strip()
+            except KeyError:
+                pass
+            text = text.lower().lstrip('/').strip()
+            user, _ = User.objects.get_or_create(
+                telegram_id=t_message['from']['id']
+            )
+            # Update user details
+            user.telegram_user_details = t_message['from']
+            user.save()
+
+            if text == 'greet':
+                user = self.get_name(t_message['from'])
+                msg = f"Hello {user}!"
+                self.message = msg
+            
+            elif text == 'rain' and chat_type == 'private':
+                self.message = get_response('rain')
+
+
+            elif text == 'deposit' and chat_type == 'private':
+                message1 = 'Send deposit to this address:'
+                message2 = '%s' % (user.simple_ledger_address)
+                send_telegram_message.delay(message1, self.dest_id, self.update_id)
+                send_telegram_message.delay(message2, self.dest_id, self.update_id)
+            # Check balance using "/balance" or "/balance@..."    
+            elif text == 'balance' or text.startswith('balance@', 0):
+                if chat_type == 'private':
+                    balance = compute_balance(user.id)
+                    balance = '{:,}'.format(round(balance, 8))
+                    
+                    balance_str = str(balance)
+                    if 'e' in balance_str:
+                        balance_str = "{:,.8f}".format(float(balance_str))
+                    if balance_str.endswith('.0'):
+                        balance_str = balance_str[:-2]
+                    user_name = self.get_name(t_message['from'])
+                    self.message = f"<b>@{user_name}</b>, you have {balance_str} \U0001f336 SPICE \U0001f336!"
+                    # Update last activity
+                    user.last_activity = timezone.now()
+                    user.save()          
+                
+            elif text.strip() == 'withdraw' and chat_type == 'private':
+                self.message = get_response('withdraw')
+                
+            elif text.startswith('withdraw ') and chat_type == 'private':
+                amount = None
+                addr = None
+                withdraw_error = ''
+                invalid_message = "You have not entered a valid amount or SLP address!"
+                try:
+                    amount_temp = text.split()[1]
+                    try:
+                        amount = amount_temp.replace(',', '').strip()
+                        amount = amount.replace("'", '').replace('"', '')
+                        if 'e' in amount:
+                            amount = None
+                            self.message = invalid_message
+                        else:
+                            amount = float(amount)
+                    except ValueError:
+                        self.message = "You have entered an invalid amount!"
+                    addr_temp = text.split()[2].strip()
+                    if  addr_temp.startswith('simpleledger') and len(addr_temp) == 55:
+                        addr = addr_temp.strip()
+                        self.message = "You have entered an invalid SLP address!"
+                except IndexError:
+                    self.message = invalid_message
+                
+                if addr and amount:
+                    if isinstance(amount, str):
+                        amount = amount.replace("'", '').replace('"', '')
+                    balance = compute_balance(user.id)
+                    try:
+                        if amount <= balance:
+                            # Limit withdrawals to 1 withdrawal per hour per user
+                            withdraw_limit = False
+                            latest_withdrawal = None
+                            try:
+                                latest_withdrawal = Withdrawal.objects.filter(
+                                    user=user
+                                ).latest('date_created')
+                            except Withdrawal.DoesNotExist:
+                                pass
+                            if latest_withdrawal:
+                                last_withdraw_time = latest_withdrawal.date_created
+                                time_now = datetime.now(timezone.utc)
+                                tdiff = time_now - last_withdraw_time
+                                withdraw_time_limit = tdiff.total_seconds()
+                                if withdraw_time_limit < 3600:
+                                    withdraw_limit = True
+                                    username = self.get_name(t_message['from'])
+                                    self.message = f"<b>@{username}</b>, you have reached your hourly withdrawal limit!"
+
+                            if not withdraw_limit:
+                                if amount >= 1000:
+                                    user = User.objects.get(telegram_id=t_message['from']['id'])
+                                    withdrawal = Withdrawal(
+                                        user=user,
+                                        address=addr,
+                                        amount=amount
+                                    )
+                                    withdrawal.save()
+                                    withdraw_spice_tokens.delay(
+                                        withdrawal.id,
+                                        chat_id=self.dest_id,
+                                        update_id=self.update_id
+                                    )
+                                    username = user.telegram_display_name
+                                    self.message = f"<b>@{username}</b>, your \U0001f336 SPICE \U0001f336 withdrawal request is being processed."
+                                else:
+                                    # username = self.get_name(t_message['from'])
+                                    self.message = f"We can’t process your withdrawal request because it is below minimum. The minimum amount allowed is 1000 \U0001f336 SPICE."
+                        else:
+                            username = self.get_name(t_message['from'])
+                            self.message = f"<b>@{username}</b>, you don't have enough \U0001f336 SPICE \U0001f336 to withdraw!"
+                    except TypeError:
+                        amount = None
+                if not addr or not amount:
+                    self.message = """
+                    Withdrawal can be done by running the following command:
+                    \n/withdraw "amount" "simpleledger_address"
+                    \n\nExample:
+                    \n/withdraw 10 simpleledger:qpgje2ycwhh2rn8v0rg5r7d8lgw2pp84zgpkd6wyer
+                    """
+
+            elif text.startswith('tip '):
+                self.tip = True
+
+            elif ' spice' in text or ' spices' in text:
+                pattern1 = re.compile('^\d+\s+spice(\s+pof)?(\s+%)?\s*$')
+                pattern2 = re.compile('^\d+\s+spices\s*\w*\d*\D*$')
+                if pattern1.match(text) or pattern2.match(text):
+                    self.tip = True
+                
+            elif text == 'spicefeedon':
+                admins = get_chat_admins(t_message["chat"]["id"])
+                if from_id in admins:
+                    group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
+                    group.post_to_spicefeed = True
+                    user = User.objects.get(telegram_id=t_message['from']['id'])
+                    group.privacy_set_by = user
+                    group.last_privacy_setting = timezone.now()
+                    group.save()
+                    self.message = 'SpiceFeed enabled\nhttps://spice.network'
+            
+            elif text == 'spicefeedoff':
+                admins = get_chat_admins(t_message["chat"]["id"])
+                if from_id in admins:
+                    group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
+                    group.post_to_spicefeed = False
+                    user = User.objects.get(telegram_id=t_message['from']['id'])
+                    group.privacy_set_by = user
+                    group.last_privacy_setting = timezone.now()
+                    group.save()
+                    self.message = 'SpiceFeed disabled'
+            
+            elif text == 'spicefeedstatus':
+                group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
+                if group.post_to_spicefeed:
+                    self.message = 'SpiceFeed is enabled\nhttps://spice.network'
+                else:
+                    self.message = 'SpiceFeed is disabled'
+            
+            else:
+                if chat_type == 'private':
+
+                    if 'tip' != text:
+                        self.message = """What can I help you with? Here are a list of my commands:
+                            \nType:
+                            \ndeposit - for information on depositing \ntip - for information on tipping SPICE points \nwithdraw - for information on withdrawing SPICE tokens \nbalance - for information on your SPICE points balance
+                            \n\nTo learn more about SpiceBot, please visit:
+                            \nhttps://spicetoken.org/bot_faq/
+                            \nIf you need further assistance, please contact https://t.me/spicetoken
+                        """
+                        
+                    if 'tip' in text:
+                        self.message = """
+                            To tip someone SPICE Points, simply **reply** to any of their messages with:
+                            \ntip [amount]
+                            \n**Example:** tip 200
+                            \nOR
+                            \n[amount] spice
+                            \n**Example:** 100 spice
+                        """
+                    else:
+                        self.message = """What can I help you with? Here are a list of my commands:
+                            \nType:
+                            \ndeposit - for information on depositing \ntip - for information on tipping SPICE points \nrain - for information on raining SPICE on others \nwithdraw - for information on withdrawing SPICE tokens \nbalance - for information on your SPICE points balance
+                            \n\nTo learn more about SpiceBot, please visit:
+                            \nhttps://spicetoken.org/bot_faq/
+                            \nIf you need further assistance, please contact https://t.me/spicetoken
+                        """
+                else:
+                    # Added plus symbol, hot pepper, thumbs up & fire emoji for tipping
+                    for i in settings.ALLOWED_SYMBOLS.keys():
+                        if str(i) in text:
+                            self.tip = True
+                            self.tip_with_emoji = True
+                            break
+
+            if self.tip:
+                if 'reply_to_message' in t_message.keys():
+                    with_pof = text.strip().lower().endswith('pof')
+                    self.handle_tipping(t_message, text, with_pof=with_pof)
+                
+
+
+        info = {
+            'text': text,
+            'entities': entities,
+            'message': self.message,
+            'data_keys': list(self.data.keys())
+        }
+        logger.info(str(info))
+        return info
+        
+    def respond(self):
+        if self.message and self.dest_id:
+
+            if self.tip and self.recipient:
+
+                group = TelegramGroup.objects.get(chat_id=self.dest_id)
+
+                content = Content(
+                    tip_amount=self.tip_amount,
+                    sender=self.sender,
+                    recipient=self.recipient,
+                    details=self.data,
+                    post_to_spicefeed=group.post_to_spicefeed,
+                    parent=self.parent,
+                    recipient_content_id=self.recipient_content_id
+                )
+                content.save()
+
+                # Sender outgoing transaction
+                transaction = Transaction(
+                    user = self.sender,
+                    amount = self.tip_amount,
+                    transaction_type = 'Outgoing'
+                )
+                transaction.save()
+
+                # Recipient incoming transaction
+                transaction = Transaction(
+                    user = self.recipient,
+                    amount = self.tip_amount,
+                    transaction_type = 'Incoming'
+                )
+                transaction.save()                                
+            send_telegram_message.delay(self.message, self.dest_id, self.update_id)
+        else:
+            logger.info(f"No response")

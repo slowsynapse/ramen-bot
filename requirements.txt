@@ -1,0 +1,54 @@
+# Core Django
+Django==2.2.1
+djangorestframework==3.9.2
+django-cors-headers==3.0.2
+gunicorn==19.9.0
+whitenoise==4.1.2
+psycopg2-binary==2.7.7
+
+# Async task queue
+celery==4.3.0
+redis==3.2.1
+amqp==2.5.0
+billiard==3.6.0.0
+kombu==4.6.3
+vine==1.3.0
+
+# HTTP/API
+requests==2.21.0
+urllib3==1.24.3
+
+# Config
+python-decouple==3.1
+pytz==2019.1
+
+# Utils
+emoji==0.5.4
+Pillow==6.1.0
+python-dateutil==2.8.0
+
+# Bitcoin Cash / CashTokens (for future token distribution)
+bitcash==0.5.2.8
+cashaddress==1.0.4
+base58==0.2.5
+pywallet==0.1.0
+
+# NEW: Twitter API (for verification and tweet fetching)
+tweepy>=4.0.0
+
+# NEW: Claude API (for LLM scoring)
+anthropic>=0.18.0
+
+# NEW: IPFS/Pinata (for ledger snapshots)
+pinatapy-vourhey>=0.1.3
+
+# Testing
+pytest==5.0.1
+pytest-cov==2.7.1
+pytest-django==3.5.1
+pytest-mock==1.10.4
+mock==3.0.5
+requests-mock==1.6.0
+
+# Process management
+git+https://github.com/Supervisor/supervisor@a0ee8f1026c929ae4d9fc84741924414e8008f49
