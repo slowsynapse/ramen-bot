@@ -4,7 +4,7 @@ import getpass
 
 
 class Command(BaseCommand):
-    help = 'Sweeps SPICE deposits to the bot wallet'
+    help = 'Sweeps BCH deposits to the bot wallet'
 
     def handle(self, *args, **options):
         seed = getpass.getpass('Seed: ')

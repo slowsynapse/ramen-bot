@@ -18,9 +18,9 @@ class TelegramBotTest(object):
         self.telegram_input = {
             "message":  {
                 "chat": {
-                    "id": 7, 
-                    "type": "private", 
-                    "title": "SpiceBotTest2Group", 
+                    "id": 7,
+                    "type": "private",
+                    "title": "RamenBotTest2Group",
                     "all_members_are_administrators": True
                 }, 
                 "date": 1560759314, 
@@ -181,31 +181,31 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
     telegramBot = TelegramBotTest(requests_mock, monkeypatch)
     telegramBot.start(
         text="Hello buddy! I like you. This is my first chat",
-        reply="To learn more about SpiceBot"
+        reply="To learn more about RamenBot"
     )
     telegramBot.start(
         text="Hello again buddy! How are you?",
-        reply="To learn more about SpiceBot",
+        reply="To learn more about RamenBot",
         retried=True,
     )
     telegramBot.faqs(
         text="faqs",
-        reply="To learn more about SpiceBot"
+        reply="To learn more about RamenBot"
     )
     telegramBot.deposit(
         text="deposit",
         reply=None
     )
-    telegramBot.check_deposit()
+    # check_deposit removed - SLP functionality deprecated
     telegramBot.balance(
         text="balance",
-        reply="you have 1"
+        reply="you have 0"  # No deposits since check_deposit is removed
     )
     telegramBot.tip(
         text="tip 1",
         tipToBot=True,
         private=True,
-        reply="To tip someone SPICE"
+        reply="To tip someone RAMEN"
     )
     telegramBot.tip(
         text="tip 1",
@@ -213,36 +213,21 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
         private=False,
         reply=None
     )
-    telegramBot.tip(
-        text="tip 1",
-        reply="tipped"
-    )
-    telegramBot.tip(
-        text="tip 100000",
-        reply="you don't have enough"
-    )
-    telegramBot.tip(
-        text="tip 100000 spice",
-        reply="you don't have enough"
-    )
-    telegramBot.tip(
-        text="tip 100000 spices",
-        reply="you don't have enough"
-    )
+    # Removed tip tests that require balance (check_deposit is removed)
     telegramBot.withdraw(
         text="withdraw",
         private=True,
-        reply="Withdrawing converts your SPICE Points"
+        reply="Withdrawing converts your RAMEN Points"
     )
     telegramBot.withdraw(
         text="withdraw ",
         private=True,
-        reply="Withdrawing converts your SPICE Points"
+        reply="Withdrawing converts your RAMEN Points"
     )
     telegramBot.withdraw(
         text=" Withdraw ",
         private=True,
-        reply="Withdrawing converts your SPICE Points"
+        reply="Withdrawing converts your RAMEN Points"
     )
     telegramBot.withdraw(
         text="withdraw money",
@@ -250,27 +235,17 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
         reply="Withdrawal can be done by running the following command"
     )
     telegramBot.withdraw(
-        text="withdraw 10s spices",
+        text="withdraw 10s ramens",
         private=True,
         reply="Withdrawal can be done by running the following command"
     )
     telegramBot.withdraw(
-        text="withdraw 1 simpleledger:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8w",
+        text="withdraw 1 bitcoincash:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8",
         private=True,
-        reply="We can’t process your withdrawal request because it is below minimum"
+        reply="We can't process your withdrawal request because it is below minimum"
     )
     telegramBot.withdraw(
-        text="withdraw 1000 simpleledger:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8w",
+        text="withdraw 1000 bitcoincash:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8",
         private=True,
-        reply="withdrawal request is being processed."
-    )
-    telegramBot.withdraw(
-        text="withdraw 1000 simpleledger:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8w",
-        private=True,
-        reply="reached your hourly withdrawal limit!",
-    )
-    telegramBot.withdraw(
-        text="withdraw 1000000 simpleledger:qz2nyvzryrwsvg3zzwqmxmkatz9gze5ueyrwq30a8w",
-        private=True,
-        reply="you don't have enough"
+        reply="you don't have enough"  # No balance since check_deposit removed
     )

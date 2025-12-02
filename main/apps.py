@@ -6,5 +6,3 @@ class MainConfig(AppConfig):
 
     def ready(self):
         import main.signals
-        from main.tasks import slpsocket_filter
-        slpsocket_filter.delay()

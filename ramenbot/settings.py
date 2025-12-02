@@ -275,16 +275,13 @@ TELEGRAM_CHANNEL_ID = config('TELEGRAM_CHANNEL_ID', default='')  # For leaderboa
 PARENT_XPUBKEY = config('PARENT_XPUBKEY', default='')
 
 ALLOWED_SYMBOLS = {
-    "+": 5,
-    "\ufe0f": 0, # this character is sometimes inserted in between emojis    
-    "\U0001f44d": 5, # thumbs up sign
-    "\U0001f525": 5, # fire
-    "\U0001f48b": 50, # kiss mark
-    "\U0001f336": 100, # hot pepper
-    "\U0001F36A": 500, # cookie
-    "\U0001f48e": 1000, # gem stone
-    "\U0001f37c": 0.00000001, # baby bottle
-    "\U0001F344": "undefined" # mushroom
+    "\ufe0f": 0, # this character is sometimes inserted in between emojis
+    "\U0001F35C": 100, # ramen bowl 🍜
+    "\U0001f525": 5, # fire 🔥
+    "\U0001f48b": 50, # kiss mark 💋
+    "\U0001f48e": 1000, # gem stone 💎
+    "\U0001f37c": 0.00000001, # baby bottle 🍼
+    "\U0001F344": "undefined" # mushroom 🍄 (random 0-999)
 }
 
 POF_SYMBOLS = {
@@ -296,3 +293,6 @@ POF_SYMBOLS = {
     5: "\U0001F525",
     6: "\U0001F4A6"
 }
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

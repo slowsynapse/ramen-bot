@@ -18,7 +18,6 @@ class TestUserModel(object):
         user = User.objects.create(
             telegram_id=321
         )
-        assert user.simple_ledger_address != ""
         assert user.bitcoincash_address != ""
 
 

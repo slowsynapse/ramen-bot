@@ -1,7 +1,7 @@
 from django.contrib import admin
 from main.utils.account import compute_balance
 from main.models import (
-    User as SpiceUser,
+    User as RamenUser,
     Content,
     Transaction,
     Deposit,
@@ -15,12 +15,12 @@ from main.models import (
 )
 
 
-admin.site.site_header = 'Spice Bot Administration'
+admin.site.site_header = 'RAMEN Bot Administration'
 
 
 class UserAdmin(admin.ModelAdmin):
-    list_display = ['id', 'telegram_display_name', 'twitter_screen_name', 'balance', 'reddit_username', 'pof']
-    search_fields = ['telegram_user_details', 'twitter_user_details', 'reddit_user_details']
+    list_display = ['id', 'telegram_display_name', 'twitter_screen_name', 'balance', 'pof']
+    search_fields = ['telegram_user_details', 'twitter_user_details']
 
     def telegram_display_name(self, obj):
         if obj.telegram_user_details:
@@ -30,15 +30,11 @@ class UserAdmin(admin.ModelAdmin):
     def twitter_screen_name(self, obj):
         return obj.twitter_screen_name
 
-    def reddit_username(self, obj):
-        if obj.reddit_user_details:
-            return obj.reddit_username
-        return str(obj.reddit_username)
     def balance(self, obj):
         return compute_balance(obj)
 
 
-admin.site.register(SpiceUser, UserAdmin)
+admin.site.register(RamenUser, UserAdmin)
 
 
 class ContentAdmin(admin.ModelAdmin):
@@ -46,7 +42,7 @@ class ContentAdmin(admin.ModelAdmin):
         'tip_amount',
         'source',
         'sender',
-        'recipient', 
+        'recipient',
         'date_created',
         'parent'
     ]
@@ -70,9 +66,9 @@ admin.site.register(Response, ResponseAdmin)
 
 class TransactionAdmin(admin.ModelAdmin):
     list_display = [
-        'user', 
-        'amount', 
-        'transaction_type', 
+        'user',
+        'amount',
+        'transaction_type',
         'date_created'
     ]
 
@@ -83,7 +79,7 @@ admin.site.register(Transaction, TransactionAdmin)
 
 class DepositAdmin(admin.ModelAdmin):
     list_display = [
-        'user', 
+        'user',
         'amount',
         'date_created',
         'date_swept'
@@ -108,14 +104,11 @@ class WithdrawalAdmin(admin.ModelAdmin):
     raw_id_fields = ['user']
 
     def channel(self, obj):
-        channel = ''
-        if obj.user.twitter_id:
-            channel = 'twitter'
         if obj.user.telegram_id:
-            channel = 'telegram'
-        if obj.user.reddit_id:
-            channel = 'reddit'
-        return channel
+            return 'telegram'
+        if obj.user.twitter_id:
+            return 'twitter'
+        return ''
 
 admin.site.register(Withdrawal, WithdrawalAdmin)
 
@@ -157,13 +150,14 @@ admin.site.register(FaucetDisbursement, FaucetDisbursementAdmin)
 class AccountAdmin(admin.ModelAdmin):
     list_display = [
         'username',
-        'email_addr'        
+        'email_addr'
     ]
 
 admin.site.register(Account, AccountAdmin)
 
-class RainAdmin(admin.ModelAdmin):    
-    list_display = [        
+
+class RainAdmin(admin.ModelAdmin):
+    list_display = [
         'sender',
         'rain_amount',
         'get_recipients'

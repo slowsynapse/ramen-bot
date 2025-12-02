@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User as usr
 from django.utils import timezone
 from datetime import timedelta, datetime
-from django.contrib.postgres.fields import JSONField
+from django.db.models import JSONField
 from bitcash import Key
 from subprocess import Popen, PIPE
 from django.conf import settings
@@ -20,18 +20,22 @@ class Account(usr):
         verbose_name_plural = 'Accounts'
 
 class User(models.Model):
-    reddit_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
-    reddit_user_details = JSONField(default=dict)
-    twitter_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
-    twitter_user_details = JSONField(default=dict)
+    # Platform identities
     telegram_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
     telegram_user_details = JSONField(default=dict)
+    twitter_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    twitter_user_details = JSONField(default=dict)
+
+    # Settings
     post_to_spicefeed = models.BooleanField(default=True)
-    simple_ledger_address = models.CharField(max_length=200, null=True, blank=True)
+
+    # BCH addresses (for future CashToken distribution)
     bitcoincash_address = models.CharField(max_length=200, null=True, blank=True)
+
+    # Metadata
     last_activity = models.DateTimeField(default=timezone.now, null=True, blank=True)
-    pof = JSONField(default=dict)
-    account = models.ForeignKey(Account, null=True, on_delete=models.PROTECT) 
+    pof = JSONField(default=dict)  # Proof of Frens score
+    account = models.ForeignKey(Account, null=True, on_delete=models.PROTECT)
     date_created = models.DateTimeField(default=timezone.now, null=True)
     
     
@@ -81,12 +85,6 @@ class User(models.Model):
         if self.twitter_user_details:
             return self.twitter_user_details['id']
 
-    @property
-    def reddit_username(self):
-        username = ''
-        if self.reddit_user_details:
-            username = self.reddit_user_details['username']
-        return username
 
     
     def rain(self, text, group_id, balance):
@@ -101,11 +99,11 @@ class User(models.Model):
         each_users = False
         message = ''
 
-        scenario_1 = re.compile('^rain\s+\d+\s+people+\s+\d+\s+spice\s+each\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
-        scenario_2 = re.compile('^rain\s+\d+\s+people+\s+\d+\s+spice\s+total\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
-        scenario_3 = re.compile('^rain\s+\d+\s+people+\s+\d+\s+spice\s+each$')
-        scenario_4 = re.compile('^rain\s+\d+\s+people+\s+\d+\s+spice\s+total$')
-        scenario_5 = re.compile('^rain\s+\d+\s+people+\s+\d+\s+spice$')    
+        scenario_1 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+each\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
+        scenario_2 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+total\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
+        scenario_3 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+each$')
+        scenario_4 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+total$')
+        scenario_5 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen$')    
 
         if not scenario_1.match(given) and not scenario_2.match(given) and not scenario_3.match(given) and not scenario_4.match(given) and not scenario_5.match(given):            
             return message
@@ -116,28 +114,28 @@ class User(models.Model):
             telegram_user_details__is_bot=False
         ).exclude(id=self.id)
         # scene_1
-        # rain 5 people 100 spice each 3/5 pof
+        # rain 5 people 100 ramen each 3/5 pof
         # scene_2
-        # rain 5 people 500 spice total 3/5 pof
+        # rain 5 people 500 ramen total 3/5 pof
         # scene_3
-        # rain 5 people 100 spice each
-        # (100 spice to each of 5 people)
+        # rain 5 people 100 ramen each
+        # (100 ramen to each of 5 people)
         # scene_4
-        # rain 5 people 500 spice total
-        # (divides 500 spice in total between 5 people)
+        # rain 5 people 500 ramen total
+        # (divides 500 ramen in total between 5 people)
         # scene_5
-        # rain 5 people 100 spice
-        # (defaults to **each**. 5 people would get 100 spice each)
+        # rain 5 people 100 ramen
+        # (defaults to **each**. 5 people would get 100 ramen each)
 
         
         text_list = filter(None, given.split(' '))        
         text_list = [x for x in text_list if x]        
 
         total_users = text_list[text_list.index('people')-1]
-        total_spice = text_list[text_list.index('spice')-1]
+        total_ramen = text_list[text_list.index('ramen')-1]
 
         if int(total_users) > 10:
-            message = "You can only rain \U0001f336 SPICE \U0001f336 to maximum of <b>10</b> people"
+            message = "You can only rain \U0001F35C RAMEN \U0001F35C to maximum of <b>10</b> people"
             return message
             
         #check scenarios
@@ -171,28 +169,28 @@ class User(models.Model):
             return ''
         
 
-        if users.count() is 0:
-            message = 'Nobody received any spice'
+        if users.count() == 0:
+            message = 'Nobody received any ramen'
         else:
             if each_users:
-                msg_total = float(total_spice) * float(total_users)
-                amount_sent = float(total_spice) * users.count()
-                amount_received = int(total_spice)
+                msg_total = float(total_ramen) * float(total_users)
+                amount_sent = float(total_ramen) * users.count()
+                amount_received = int(total_ramen)
                 temp = 'each'
             else:
-                msg_total = float(total_spice) 
-                amount_sent = float(total_spice) 
-                amount_received = float(total_spice) / users.count()
-                temp = 'in total'           
+                msg_total = float(total_ramen)
+                amount_sent = float(total_ramen)
+                amount_received = float(total_ramen) / users.count()
+                temp = 'in total'
 
             #check rain amount
             from_name = self.telegram_display_name or self.telegram_username
             if balance < msg_total:
-                message = f"<b>@{from_name}</b>, you don't have enough \U0001f336 SPICE \U0001f336!"
+                message = f"<b>@{from_name}</b>, you don't have enough \U0001F35C RAMEN \U0001F35C!"
                 return message
 
             if msg_total < 500:
-                message = 'Hi! The minimum amount needed to invoke rain is 500 spice. Please try again.'
+                message = 'Hi! The minimum amount needed to invoke rain is 500 RAMEN. Please try again.'
                 return message
 
             #Save rain
@@ -226,37 +224,27 @@ class User(models.Model):
                     first = False
                 else:
                     users_str += ', ' + u.telegram_display_name
-            message = '<b>%s</b> just rained %s \U0001f336 SPICE \U0001f336 %s to: <b>%s</b>' % (self.telegram_display_name, total_spice, temp, users_str)        
+            message = '<b>%s</b> just rained %s \U0001F35C RAMEN \U0001F35C %s to: <b>%s</b>' % (self.telegram_display_name, total_ramen, temp, users_str)        
 
         return message
 
 
     def get_username(self):
-        return self.telegram_display_name or self.telegram_username or self.twitter_screen_name or self.reddit_username
+        return self.telegram_display_name or self.telegram_username or self.twitter_screen_name
 
     def get_source(self):
-        if self.twitter_user_details:
-            return 'twitter'
-        elif self.reddit_user_details:
-            return 'reddit'
-        elif self.telegram_user_details:
+        if self.telegram_user_details:
             return 'telegram'
-        # return [self.twitter_user_details, self.reddit_user_details, self.telegram_user_details]
+        elif self.twitter_user_details:
+            return 'twitter'
+        return 'unknown'
 
     def __str__(self):
-        if self.twitter_user_details:
-            return self.twitter_user_details['screen_name']
         if self.telegram_user_details:
-            return self.telegram_user_details['first_name']
-        if self.reddit_user_details:
-            return self.reddit_user_details['username']
-        else:
-            if self.telegram_id:
-                return self.telegram_id
-            if self.twitter_id:
-                return self.twitter_id
-            else:
-                return self.reddit_id
+            return self.telegram_user_details.get('first_name', self.telegram_id or 'Unknown')
+        if self.twitter_user_details:
+            return self.twitter_user_details.get('screen_name', self.twitter_id or 'Unknown')
+        return self.telegram_id or self.twitter_id or str(self.id)
 
         
 class Withdrawal(models.Model):
@@ -388,7 +376,7 @@ class Deposit(models.Model):
     date_swept = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return 'Deposit: %s SPICE' % self.amount
+        return 'Deposit: %s RAMEN' % self.amount
 
 
 class Media(models.Model):
