@@ -1,4 +1,4 @@
-# RAMEN Bot Troubleshooting Guide
+# CHIP Bot Troubleshooting Guide
 
 ## Quick Setup
 

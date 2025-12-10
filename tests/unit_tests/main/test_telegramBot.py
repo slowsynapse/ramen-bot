@@ -20,7 +20,7 @@ class TelegramBotTest(object):
                 "chat": {
                     "id": 7,
                     "type": "private",
-                    "title": "RamenBotTest2Group",
+                    "title": "ChipBotTest2Group",
                     "all_members_are_administrators": True
                 }, 
                 "date": 1560759314, 
@@ -181,16 +181,16 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
     telegramBot = TelegramBotTest(requests_mock, monkeypatch)
     telegramBot.start(
         text="Hello buddy! I like you. This is my first chat",
-        reply="To learn more about RamenBot"
+        reply="To learn more about ChipBot"
     )
     telegramBot.start(
         text="Hello again buddy! How are you?",
-        reply="To learn more about RamenBot",
+        reply="To learn more about ChipBot",
         retried=True,
     )
     telegramBot.faqs(
         text="faqs",
-        reply="To learn more about RamenBot"
+        reply="To learn more about ChipBot"
     )
     telegramBot.deposit(
         text="deposit",
@@ -205,7 +205,7 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
         text="tip 1",
         tipToBot=True,
         private=True,
-        reply="To tip someone RAMEN"
+        reply="To tip someone CHIP"
     )
     telegramBot.tip(
         text="tip 1",
@@ -217,17 +217,17 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
     telegramBot.withdraw(
         text="withdraw",
         private=True,
-        reply="Withdrawing converts your RAMEN Points"
+        reply="Withdrawing converts your CHIP Points"
     )
     telegramBot.withdraw(
         text="withdraw ",
         private=True,
-        reply="Withdrawing converts your RAMEN Points"
+        reply="Withdrawing converts your CHIP Points"
     )
     telegramBot.withdraw(
         text=" Withdraw ",
         private=True,
-        reply="Withdrawing converts your RAMEN Points"
+        reply="Withdrawing converts your CHIP Points"
     )
     telegramBot.withdraw(
         text="withdraw money",
@@ -235,7 +235,7 @@ def test_telegramBot_transaction(requests_mock, monkeypatch):
         reply="Withdrawal can be done by running the following command"
     )
     telegramBot.withdraw(
-        text="withdraw 10s ramens",
+        text="withdraw 10s chips",
         private=True,
         reply="Withdrawal can be done by running the following command"
     )

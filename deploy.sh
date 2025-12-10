@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy RAMEN bot to VPS
+# Deploy CHIP bot to VPS
 # Usage: ./deploy.sh [message]
 
 set -e
@@ -7,7 +7,7 @@ set -e
 VPS="root@157.245.152.152"
 REMOTE_DIR="/var/www/ramen-bot"
 
-echo "=== Deploying RAMEN Bot ==="
+echo "=== Deploying CHIP Bot ==="
 
 # 1. Commit and push local changes (if message provided)
 if [ -n "$1" ]; then

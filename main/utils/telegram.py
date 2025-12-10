@@ -186,8 +186,8 @@ class TelegramBotHandler(object):
                         self.tip_amount = float(amount)
 
 
-                elif ' ramen' in text:
-                    amount = text.split(' ramen')[0].split()[-1].replace(',', '')
+                elif ' chip' in text:
+                    amount = text.split(' chip')[0].split()[-1].replace(',', '')
                     self.tip_amount = float(amount)
 
 
@@ -225,7 +225,7 @@ class TelegramBotHandler(object):
                             if 'e' in amount_str:
                                 amount_str = "{:,.8f}".format(float(amount_str))
 
-                            self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b>"
+                            self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001F7E2 CHIP \U0001F7E2 to <b>{to_username}</b>"
 
                             #get pof
                             pct_sender, pof_sender = self.compute_POF(sender, text)
@@ -233,25 +233,25 @@ class TelegramBotHandler(object):
 
                             #set of replies
                             if text.count(' pof %') or text.count('pof % '):
-                                self.message = f"<b>{from_username}</b> (PoF <b>{pct_sender}</b>% {settings.POF_SYMBOLS[pof_sender]}) tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b> (PoF <b>{pct_receiver}</b>% {settings.POF_SYMBOLS[pof_receiver]})"
+                                self.message = f"<b>{from_username}</b> (PoF <b>{pct_sender}</b>% {settings.POF_SYMBOLS[pof_sender]}) tipped {amount_str} \U0001F7E2 CHIP \U0001F7E2 to <b>{to_username}</b> (PoF <b>{pct_receiver}</b>% {settings.POF_SYMBOLS[pof_receiver]})"
                             elif text.count(' pof') or text.count('pof '):
-                                self.message = f"<b>{from_username}</b> (PoF <b>{pof_sender}/5 {settings.POF_SYMBOLS[pof_sender]}</b>) tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b> (PoF <b>{pof_receiver}/5 {settings.POF_SYMBOLS[pof_receiver]}</b>)"
+                                self.message = f"<b>{from_username}</b> (PoF <b>{pof_sender}/5 {settings.POF_SYMBOLS[pof_sender]}</b>) tipped {amount_str} \U0001F7E2 CHIP \U0001F7E2 to <b>{to_username}</b> (PoF <b>{pof_receiver}/5 {settings.POF_SYMBOLS[pof_receiver]}</b>)"
                             else:
-                                self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b>"
+                                self.message = f"<b>{from_username}</b> tipped {amount_str} \U0001F7E2 CHIP \U0001F7E2 to <b>{to_username}</b>"
                     else:
                         logger.info('Insufficient balance')
                         # if not self.tip_with_emoji:
-                        self.message = f"<b>@{from_username}</b>, you don't have enough \U0001F35C RAMEN \U0001F35C!"
+                        self.message = f"<b>@{from_username}</b>, you don't have enough \U0001F7E2 CHIP \U0001F7E2!"
                         self.tip = False
                 else:
                     self.tip = False
             # Prevent users from sending tips to bot
             elif to_firstname == settings.TELEGRAM_BOT_USER:
                 if message['chat']['type']  == 'private':
-                    self.message = f"""To tip someone RAMEN points reply to any of their messages with:
+                    self.message = f"""To tip someone CHIP points reply to any of their messages with:
                                     \ntip [amount] \nExample: tip 200
                                     \nOR
-                                    \n[amount] ramen \nExample: 100 ramen"""
+                                    \n[amount] chip \nExample: 100 chip"""
                 self.tip = False
         except ValueError:            
             pass
@@ -397,7 +397,7 @@ class TelegramBotHandler(object):
             # Build reaction emoji string for the message
             reaction_emoji_str = ''.join(added_emoji)
 
-            self.message = f"{reaction_emoji_str} <b>{from_username}</b> reacted and tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b>"
+            self.message = f"{reaction_emoji_str} <b>{from_username}</b> reacted and tipped {amount_str} \U0001F7E2 CHIP \U0001F7E2 to <b>{to_username}</b>"
 
             # Store recipient content id for tracking
             self.recipient_content_id = json.dumps({
@@ -544,7 +544,7 @@ class TelegramBotHandler(object):
 
 
             elif text == 'deposit' and chat_type == 'private':
-                message1 = 'Send RAMEN token deposits to this address:'
+                message1 = 'Send CHIP token deposits to this address:'
                 message2 = '%s' % (user.bitcoincash_address)
                 send_telegram_message.delay(message1, self.dest_id, self.update_id)
                 send_telegram_message.delay(message2, self.dest_id, self.update_id)
@@ -560,7 +560,7 @@ class TelegramBotHandler(object):
                     if balance_str.endswith('.0'):
                         balance_str = balance_str[:-2]
                     user_name = self.get_name(t_message['from'])
-                    self.message = f"<b>@{user_name}</b>, you have {balance_str} \U0001F35C RAMEN \U0001F35C!"
+                    self.message = f"<b>@{user_name}</b>, you have {balance_str} \U0001F7E2 CHIP \U0001F7E2!"
                     # Update last activity
                     user.last_activity = timezone.now()
                     user.save()          
@@ -619,18 +619,18 @@ class TelegramBotHandler(object):
 
                             if not withdraw_limit:
                                 if amount >= 1000:
-                                    # TODO: Re-implement withdrawal for RAMEN
+                                    # TODO: Re-implement withdrawal for CHIP
                                     # For now, withdrawals are disabled
                                     self.message = "Withdrawals are temporarily disabled."
                                 else:
-                                    self.message = f"We can't process your withdrawal request because it is below minimum. The minimum amount allowed is 1000 \U0001F35C RAMEN."
+                                    self.message = f"We can't process your withdrawal request because it is below minimum. The minimum amount allowed is 1000 \U0001F7E2 CHIP."
                         else:
                             username = self.get_name(t_message['from'])
-                            self.message = f"<b>@{username}</b>, you don't have enough \U0001F35C RAMEN \U0001F35C to withdraw!"
+                            self.message = f"<b>@{username}</b>, you don't have enough \U0001F7E2 CHIP \U0001F7E2 to withdraw!"
                     except TypeError:
                         amount = None
                 if not addr or not amount:
-                    self.message = """Withdrawing converts your RAMEN Points to RAMEN Tokens (CashTokens).
+                    self.message = """Withdrawing converts your CHIP Points to CHIP Tokens (CashTokens).
                     \n\nWithdrawals are currently disabled. When enabled, you will be able to withdraw using:
                     \n/withdraw "amount" "cashtoken_address"
                     """
@@ -638,40 +638,40 @@ class TelegramBotHandler(object):
             elif text.startswith('tip '):
                 self.tip = True
 
-            elif ' ramen' in text or ' ramens' in text:
-                pattern1 = re.compile(r'^\d+\s+ramen(\s+pof)?(\s+%)?\s*$')
-                pattern2 = re.compile(r'^\d+\s+ramens\s*\w*\d*\D*$')
+            elif ' chip' in text or ' chips' in text:
+                pattern1 = re.compile(r'^\d+\s+chip(\s+pof)?(\s+%)?\s*$')
+                pattern2 = re.compile(r'^\d+\s+chips\s*\w*\d*\D*$')
                 if pattern1.match(text) or pattern2.match(text):
                     self.tip = True
                 
-            elif text == 'ramenfeedon':
+            elif text == 'chipfeedon':
                 admins = get_chat_admins(t_message["chat"]["id"])
                 if from_id in admins:
                     group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
-                    group.post_to_spicefeed = True
+                    group.post_to_chipfeed = True
                     user = User.objects.get(telegram_id=t_message['from']['id'])
                     group.privacy_set_by = user
                     group.last_privacy_setting = timezone.now()
                     group.save()
-                    self.message = 'RamenFeed enabled'
+                    self.message = 'ChipFeed enabled'
 
-            elif text == 'ramenfeedoff':
+            elif text == 'chipfeedoff':
                 admins = get_chat_admins(t_message["chat"]["id"])
                 if from_id in admins:
                     group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
-                    group.post_to_spicefeed = False
+                    group.post_to_chipfeed = False
                     user = User.objects.get(telegram_id=t_message['from']['id'])
                     group.privacy_set_by = user
                     group.last_privacy_setting = timezone.now()
                     group.save()
-                    self.message = 'RamenFeed disabled'
+                    self.message = 'ChipFeed disabled'
 
-            elif text == 'ramenfeedstatus':
+            elif text == 'chipfeedstatus':
                 group = TelegramGroup.objects.get(chat_id=t_message["chat"]["id"])
-                if group.post_to_spicefeed:
-                    self.message = 'RamenFeed is enabled'
+                if group.post_to_chipfeed:
+                    self.message = 'ChipFeed is enabled'
                 else:
-                    self.message = 'RamenFeed is disabled'
+                    self.message = 'ChipFeed is disabled'
             
             else:
                 if chat_type == 'private':
@@ -679,25 +679,25 @@ class TelegramBotHandler(object):
                     if 'tip' != text:
                         self.message = """What can I help you with? Here are a list of my commands:
                             \nType:
-                            \ndeposit - for information on depositing \ntip - for information on tipping RAMEN points \nwithdraw - for information on withdrawing RAMEN \nbalance - for information on your RAMEN points balance
-                            \n\nTo learn more about RamenBot, please visit:
+                            \ndeposit - for information on depositing \ntip - for information on tipping CHIP points \nwithdraw - for information on withdrawing CHIP \nbalance - for information on your CHIP points balance
+                            \n\nTo learn more about ChipBot, please visit:
                             \nhttps://t.me/IAMBCH_BOT
                         """
 
                     if 'tip' in text:
                         self.message = """
-                            To tip someone RAMEN Points, simply **reply** to any of their messages with:
+                            To tip someone CHIP Points, simply **reply** to any of their messages with:
                             \ntip [amount]
                             \n**Example:** tip 200
                             \nOR
-                            \n[amount] ramen
-                            \n**Example:** 100 ramen
+                            \n[amount] chip
+                            \n**Example:** 100 chip
                         """
                     else:
                         self.message = """What can I help you with? Here are a list of my commands:
                             \nType:
-                            \ndeposit - for information on depositing \ntip - for information on tipping RAMEN points \nrain - for information on raining RAMEN on others \nwithdraw - for information on withdrawing RAMEN \nbalance - for information on your RAMEN points balance
-                            \n\nTo learn more about RamenBot, please visit:
+                            \ndeposit - for information on depositing \ntip - for information on tipping CHIP points \nrain - for information on raining CHIP on others \nwithdraw - for information on withdrawing CHIP \nbalance - for information on your CHIP points balance
+                            \n\nTo learn more about ChipBot, please visit:
                             \nhttps://t.me/IAMBCH_BOT
                         """
                 else:
@@ -736,7 +736,7 @@ class TelegramBotHandler(object):
                     sender=self.sender,
                     recipient=self.recipient,
                     details=self.data,
-                    post_to_spicefeed=group.post_to_spicefeed,
+                    post_to_chipfeed=group.post_to_chipfeed,
                     parent=self.parent,
                     recipient_content_id=self.recipient_content_id
                 )

@@ -37,7 +37,7 @@ class TelegramBotView(View):
 
 
 class StatsView(View):
-    """Basic stats endpoint for RAMEN."""
+    """Basic stats endpoint for CHIP."""
 
     def get(self, request):
         tg_channels = TelegramGroup.objects.all()
@@ -67,7 +67,7 @@ class StatsView(View):
 
 
 class LeaderboardView(View):
-    """Leaderboard endpoint for RAMEN."""
+    """Leaderboard endpoint for CHIP."""
 
     def get(self, request):
         category = request.GET.get('category', 'sent')

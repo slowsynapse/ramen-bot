@@ -1,6 +1,6 @@
-# RAMEN Bot
+# CHIP Bot
 
-A Telegram bot that rewards quality BCH content with RAMEN points. Built for the BCH-1 Hackcelerator.
+A Telegram bot that rewards quality BCH content with CHIP points. Built for the BCH-1 Hackcelerator.
 
 ## Features
 
@@ -54,7 +54,7 @@ TWITTER_BEARER_TOKEN=xxx
 ANTHROPIC_API_KEY=xxx
 PINATA_API_KEY=xxx
 PINATA_SECRET_KEY=xxx
-RAMEN_SALT=your_secret_salt
+CHIP_SALT=your_secret_salt
 POSTGRES_DB=ramenbot
 REDIS_HOST=localhost
 ```

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from main.utils.account import compute_balance
 from main.models import (
-    User as RamenUser,
+    User as ChipUser,
     Content,
     Transaction,
     Deposit,
@@ -15,7 +15,7 @@ from main.models import (
 )
 
 
-admin.site.site_header = 'RAMEN Bot Administration'
+admin.site.site_header = 'CHIP Bot Administration'
 
 
 class UserAdmin(admin.ModelAdmin):
@@ -34,7 +34,7 @@ class UserAdmin(admin.ModelAdmin):
         return compute_balance(obj)
 
 
-admin.site.register(RamenUser, UserAdmin)
+admin.site.register(ChipUser, UserAdmin)
 
 
 class ContentAdmin(admin.ModelAdmin):
@@ -126,7 +126,7 @@ class TelegramGroupAdmin(admin.ModelAdmin):
     list_display = [
         'title',
         'chat_type',
-        'post_to_spicefeed',
+        'post_to_chipfeed',
         'privacy_set_by'
     ]
 

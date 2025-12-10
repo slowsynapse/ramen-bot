@@ -45,7 +45,7 @@ def send_telegram_message(message, chat_id, update_id, reply_to_message_id=None)
         logger.error(f"Failed to send Telegram message: {response.text}")
 
 
-# TODO: Add RAMEN-specific tasks
+# TODO: Add CHIP-specific tasks
 # @shared_task(queue='twitter')
 # def verify_twitter_link(user_id, tweet_url):
 #     """Verify user's Twitter account via verification tweet"""

@@ -1,5 +1,5 @@
 """
-Django settings for RAMEN bot project.
+Django settings for CHIP bot project.
 
 Adapted from spicebot for BCH-1 Hackcelerator.
 
@@ -75,10 +75,8 @@ ROOT_URLCONF = 'ramenbot.urls'
 
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:5555',
-    'https://spice.network',
     'http://localhost:8080',
-    'https://spicefeed-dev.scibizinformatics.com',
-    'https://spicefeed-staging.scibizinformatics.com'
+    # Legacy spice URLs removed - add chipfeed URLs when available
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -240,7 +238,7 @@ CELERYD_PREFETCH_MULTIPLIER = 1
 CELERYD_MAX_TASKS_PER_CHILD = 5
 
 CELERY_BEAT_SCHEDULE = {
-    # Scheduled tasks for RAMEN
+    # Scheduled tasks for CHIP
     # 'weekly-snapshot': {
     #     'task': 'main.tasks.publish_ipfs_snapshot',
     #     'schedule': crontab(day_of_week='sun', hour=0)
@@ -267,8 +265,8 @@ ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 PINATA_API_KEY = config('PINATA_API_KEY', default='')
 PINATA_SECRET_KEY = config('PINATA_SECRET_KEY', default='')
 
-# RAMEN specific settings
-RAMEN_SALT = config('RAMEN_SALT', default='change_this_secret')
+# CHIP specific settings
+CHIP_SALT = config('CHIP_SALT', default='change_this_secret')
 TELEGRAM_CHANNEL_ID = config('TELEGRAM_CHANNEL_ID', default='')  # For leaderboard posts
 
 # Keep for future CashToken distribution
@@ -276,7 +274,7 @@ PARENT_XPUBKEY = config('PARENT_XPUBKEY', default='')
 
 ALLOWED_SYMBOLS = {
     "\ufe0f": 0, # this character is sometimes inserted in between emojis
-    "\U0001F35C": 100, # ramen bowl 🍜
+    "\U0001F7E2": 100, # green circle 🟢
     "\U0001f525": 5, # fire 🔥
     "\U0001f48b": 50, # kiss mark 💋
     "\U0001f48e": 1000, # gem stone 💎
@@ -291,8 +289,8 @@ REACTION_TIPPING_ENABLED = True
 # Emoji reactions that trigger tips (only these will be processed)
 # Note: These must be valid Telegram reaction emoji
 REACTION_SYMBOLS = {
-    "\U0001f525": 50,  # fire 🔥 - 50 RAMEN
-    "\u2764": 25,      # red heart ❤ - 25 RAMEN
+    "\U0001f525": 50,  # fire 🔥 - 50 CHIP
+    "\u2764": 25,      # red heart ❤ - 25 CHIP
 }
 
 POF_SYMBOLS = {

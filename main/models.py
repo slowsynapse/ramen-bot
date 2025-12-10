@@ -27,7 +27,7 @@ class User(models.Model):
     twitter_user_details = JSONField(default=dict)
 
     # Settings
-    post_to_spicefeed = models.BooleanField(default=True)
+    post_to_chipfeed = models.BooleanField(default=True)
 
     # BCH addresses (for future CashToken distribution)
     bitcoincash_address = models.CharField(max_length=200, null=True, blank=True)
@@ -94,16 +94,15 @@ class User(models.Model):
         users = group.users.all()
 
         total_users = 0
-        total_spice = 0
         pof = 0
         each_users = False
         message = ''
 
-        scenario_1 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+each\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
-        scenario_2 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+total\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
-        scenario_3 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+each$')
-        scenario_4 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen\s+total$')
-        scenario_5 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+ramen$')    
+        scenario_1 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+chip\s+each\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
+        scenario_2 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+chip\s+total\s+(?:[0-6]|0[0-6]|6)[\/](?:[1-5]|0[1-5]|5)\s+pof$')
+        scenario_3 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+chip\s+each$')
+        scenario_4 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+chip\s+total$')
+        scenario_5 = re.compile(r'^rain\s+\d+\s+people+\s+\d+\s+chip$')    
 
         if not scenario_1.match(given) and not scenario_2.match(given) and not scenario_3.match(given) and not scenario_4.match(given) and not scenario_5.match(given):            
             return message
@@ -114,28 +113,28 @@ class User(models.Model):
             telegram_user_details__is_bot=False
         ).exclude(id=self.id)
         # scene_1
-        # rain 5 people 100 ramen each 3/5 pof
+        # rain 5 people 100 chip each 3/5 pof
         # scene_2
-        # rain 5 people 500 ramen total 3/5 pof
+        # rain 5 people 500 chip total 3/5 pof
         # scene_3
-        # rain 5 people 100 ramen each
-        # (100 ramen to each of 5 people)
+        # rain 5 people 100 chip each
+        # (100 chip to each of 5 people)
         # scene_4
-        # rain 5 people 500 ramen total
-        # (divides 500 ramen in total between 5 people)
+        # rain 5 people 500 chip total
+        # (divides 500 chip in total between 5 people)
         # scene_5
-        # rain 5 people 100 ramen
-        # (defaults to **each**. 5 people would get 100 ramen each)
+        # rain 5 people 100 chip
+        # (defaults to **each**. 5 people would get 100 chip each)
 
         
         text_list = filter(None, given.split(' '))        
         text_list = [x for x in text_list if x]        
 
         total_users = text_list[text_list.index('people')-1]
-        total_ramen = text_list[text_list.index('ramen')-1]
+        total_chip = text_list[text_list.index('chip')-1]
 
         if int(total_users) > 10:
-            message = "You can only rain \U0001F35C RAMEN \U0001F35C to maximum of <b>10</b> people"
+            message = "You can only rain \U0001F7E2 CHIP \U0001F7E2 to maximum of <b>10</b> people"
             return message
             
         #check scenarios
@@ -170,27 +169,27 @@ class User(models.Model):
         
 
         if users.count() == 0:
-            message = 'Nobody received any ramen'
+            message = 'Nobody received any chip'
         else:
             if each_users:
-                msg_total = float(total_ramen) * float(total_users)
-                amount_sent = float(total_ramen) * users.count()
-                amount_received = int(total_ramen)
+                msg_total = float(total_chip) * float(total_users)
+                amount_sent = float(total_chip) * users.count()
+                amount_received = int(total_chip)
                 temp = 'each'
             else:
-                msg_total = float(total_ramen)
-                amount_sent = float(total_ramen)
-                amount_received = float(total_ramen) / users.count()
+                msg_total = float(total_chip)
+                amount_sent = float(total_chip)
+                amount_received = float(total_chip) / users.count()
                 temp = 'in total'
 
             #check rain amount
             from_name = self.telegram_display_name or self.telegram_username
             if balance < msg_total:
-                message = f"<b>@{from_name}</b>, you don't have enough \U0001F35C RAMEN \U0001F35C!"
+                message = f"<b>@{from_name}</b>, you don't have enough \U0001F7E2 CHIP \U0001F7E2!"
                 return message
 
             if msg_total < 500:
-                message = 'Hi! The minimum amount needed to invoke rain is 500 RAMEN. Please try again.'
+                message = 'Hi! The minimum amount needed to invoke rain is 500 CHIP. Please try again.'
                 return message
 
             #Save rain
@@ -224,7 +223,7 @@ class User(models.Model):
                     first = False
                 else:
                     users_str += ', ' + u.telegram_display_name
-            message = '<b>%s</b> just rained %s \U0001F35C RAMEN \U0001F35C %s to: <b>%s</b>' % (self.telegram_display_name, total_ramen, temp, users_str)        
+            message = '<b>%s</b> just rained %s \U0001F7E2 CHIP \U0001F7E2 %s to: <b>%s</b>' % (self.telegram_display_name, total_chip, temp, users_str)        
 
         return message
 
@@ -265,7 +264,7 @@ class TelegramGroup(models.Model):
     chat_id = models.CharField(max_length=50, unique=True)
     chat_type = models.CharField(max_length=20)
     title = models.CharField(max_length=70)
-    post_to_spicefeed = models.BooleanField(default=True)
+    post_to_chipfeed = models.BooleanField(default=True)
     last_privacy_setting = models.DateTimeField(
         default=timezone.now
     )
@@ -295,7 +294,7 @@ class Content(models.Model):
         on_delete=models.PROTECT
     )
     details = JSONField(default=dict)
-    post_to_spicefeed = models.BooleanField(default=True)
+    post_to_chipfeed = models.BooleanField(default=True)
     date_created = models.DateTimeField(default=timezone.now)
     recipient_content_id = JSONField(default=dict, null=True)
     parent = models.ForeignKey(
@@ -376,7 +375,7 @@ class Deposit(models.Model):
     date_swept = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return 'Deposit: %s RAMEN' % self.amount
+        return 'Deposit: %s CHIP' % self.amount
 
 
 class Media(models.Model):
