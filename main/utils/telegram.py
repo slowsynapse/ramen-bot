@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.db.models import Sum
 
-from main.models import User, Content, Transaction, Withdrawal, TelegramGroup
+from main.models import User, Content, Transaction, Withdrawal, TelegramGroup, TelegramMessage
 from main.tasks import send_telegram_message
 from .responses import get_response
 from .account import compute_balance
@@ -56,7 +56,8 @@ class TelegramBotHandler(object):
         self.message = None
         self.dest_id = None
         self.tip = False
-        self.tip_with_emoji =False
+        self.tip_with_emoji = False
+        self.reply_to_message_id = None  # For reaction tips to reply to original message
 
 
     @staticmethod
@@ -275,6 +276,145 @@ class TelegramBotHandler(object):
                return True
         return False
 
+    def _store_message_author(self, t_message, user):
+        """
+        Store message author for reaction-based tipping lookup.
+        This is isolated and only runs when REACTION_TIPPING_ENABLED is True.
+        """
+        if not getattr(settings, 'REACTION_TIPPING_ENABLED', False):
+            return
+
+        try:
+            chat_id = t_message["chat"]["id"]
+            message_id = t_message["message_id"]
+
+            TelegramMessage.objects.get_or_create(
+                chat_id=chat_id,
+                message_id=message_id,
+                defaults={'author': user}
+            )
+        except Exception as e:
+            # Don't let message tracking errors affect normal bot operation
+            logger.warning(f"Failed to store message author: {e}")
+
+    def process_reaction(self):
+        """
+        Handle native Telegram emoji reactions for tipping.
+        This method is completely isolated from process_data() for easy removal.
+        """
+        if not getattr(settings, 'REACTION_TIPPING_ENABLED', False):
+            return
+
+        reaction_data = self.data.get('message_reaction', {})
+        if not reaction_data:
+            return
+
+        try:
+            chat = reaction_data.get('chat', {})
+            chat_id = chat.get('id')
+            message_id = reaction_data.get('message_id')
+            reactor_info = reaction_data.get('user', {})
+            reactor_id = reactor_info.get('id')
+            new_reactions = reaction_data.get('new_reaction', [])
+            old_reactions = reaction_data.get('old_reaction', [])
+
+            if not all([chat_id, message_id, reactor_id]):
+                return
+
+            # Only process if new reactions were added (not just removed)
+            # Compare by converting to sets of emoji strings
+            old_emoji_set = {r.get('emoji') for r in old_reactions if r.get('type') == 'emoji'}
+            new_emoji_set = {r.get('emoji') for r in new_reactions if r.get('type') == 'emoji'}
+            added_emoji = new_emoji_set - old_emoji_set
+
+            if not added_emoji:
+                return
+
+            # Look up message author from our stored records
+            try:
+                msg_record = TelegramMessage.objects.get(
+                    chat_id=chat_id,
+                    message_id=message_id
+                )
+                recipient = msg_record.author
+            except TelegramMessage.DoesNotExist:
+                logger.debug(f"No stored author for message {message_id} in chat {chat_id}")
+                return
+
+            # Get reactor (sender of the tip)
+            sender, _ = User.objects.get_or_create(telegram_id=reactor_id)
+            sender.telegram_user_details = reactor_info
+            sender.last_activity = timezone.now()
+            sender.save()
+
+            # Prevent self-tipping
+            if sender.id == recipient.id:
+                return
+
+            # Prevent tipping bots
+            if recipient.telegram_user_details.get('is_bot', False):
+                return
+
+            # Calculate tip amount from added reaction emoji
+            reaction_symbols = getattr(settings, 'REACTION_SYMBOLS', {})
+            tip_amount = 0
+            for emoji_char in added_emoji:
+                if emoji_char in reaction_symbols:
+                    tip_amount += reaction_symbols[emoji_char]
+
+            if tip_amount <= 0:
+                return
+
+            # Check sender balance
+            balance = compute_balance(sender.id)
+            if balance < tip_amount:
+                logger.info(f"Reaction tip failed: insufficient balance for user {sender.id}")
+                return
+
+            # Process the tip
+            self.sender = sender
+            self.recipient = recipient
+            self.tip_amount = tip_amount
+            self.tip = True
+            self.dest_id = chat_id
+
+            # Get display names
+            from_username = sender.telegram_display_name or sender.telegram_username or str(sender.telegram_id)
+            to_username = recipient.telegram_display_name or recipient.telegram_username or str(recipient.telegram_id)
+
+            # Format amount string
+            if tip_amount > 1:
+                amount_str = '{:,}'.format(round(tip_amount, 8))
+            else:
+                amount_str = '{:,.8f}'.format(round(tip_amount, 8))
+            if amount_str.endswith('.0'):
+                amount_str = amount_str[:-2]
+            if '.' in amount_str:
+                amount_str = amount_str.rstrip('0')
+            if amount_str.endswith('.'):
+                amount_str = amount_str[:-1]
+
+            # Build reaction emoji string for the message
+            reaction_emoji_str = ''.join(added_emoji)
+
+            self.message = f"{reaction_emoji_str} <b>{from_username}</b> reacted and tipped {amount_str} \U0001F35C RAMEN \U0001F35C to <b>{to_username}</b>"
+
+            # Store recipient content id for tracking
+            self.recipient_content_id = json.dumps({
+                'chat_id': chat_id,
+                'message_id': message_id
+            })
+            self.parent = None
+
+            # Store message_id to reply to the original message
+            self.reply_to_message_id = message_id
+
+            logger.info(f"Reaction tip: {sender.id} -> {recipient.id}, amount: {tip_amount}")
+
+        except Exception as e:
+            logger.error(f"Error processing reaction: {e}")
+            return
+
     def process_data(self):
         text = ''
         amount = None
@@ -329,6 +469,9 @@ class TelegramBotHandler(object):
                         )
                     group.users.add(user)
                     group.save()
+
+                # Store message author for reaction-based tipping (isolated feature)
+                self._store_message_author(t_message, user)
 
             if not settings.REDISKV.sismember('telegram_msgs', self.update_id):
                 try:
@@ -613,7 +756,12 @@ class TelegramBotHandler(object):
                     amount = self.tip_amount,
                     transaction_type = 'Incoming'
                 )
-                transaction.save()                                
-            send_telegram_message.delay(self.message, self.dest_id, self.update_id)
+                transaction.save()
+            send_telegram_message.delay(
+                self.message,
+                self.dest_id,
+                self.update_id,
+                self.reply_to_message_id  # Reply to original message for reaction tips
+            )
         else:
             logger.info(f"No response")

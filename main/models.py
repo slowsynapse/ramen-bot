@@ -415,3 +415,31 @@ class Rain(models.Model):
 
     def get_recipients(self):
         return "\n".join([r.telegram_display_name for r in self.recepients.all()])
+
+
+class TelegramMessage(models.Model):
+    """
+    Tracks message authors for reaction-based tipping.
+    Required because Telegram's Bot API doesn't provide a way to look up
+    message authors by message_id - we must store them as messages arrive.
+
+    This model is isolated and can be safely removed if the reaction tipping
+    feature is disabled. See REACTION_TIPPING_ENABLED in settings.
+    """
+    chat_id = models.BigIntegerField()
+    message_id = models.BigIntegerField()
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='telegram_messages'
+    )
+    date_created = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('chat_id', 'message_id')
+        indexes = [
+            models.Index(fields=['chat_id', 'message_id']),
+        ]
+
+    def __str__(self):
+        return f"Message {self.message_id} in chat {self.chat_id} by {self.author}"

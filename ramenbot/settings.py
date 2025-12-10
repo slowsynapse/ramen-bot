@@ -25,7 +25,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'zu_jn)inc@e5-#@8$mujfto*c^5a(z+e@e(zy00tg4y@dfsa8r'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -282,6 +282,17 @@ ALLOWED_SYMBOLS = {
     "\U0001f48e": 1000, # gem stone 💎
     "\U0001f37c": 0.00000001, # baby bottle 🍼
     "\U0001F344": "undefined" # mushroom 🍄 (random 0-999)
+}
+
+# Reaction-based tipping settings
+# Set to False to disable reaction tipping entirely (easy feature toggle)
+REACTION_TIPPING_ENABLED = True
+
+# Emoji reactions that trigger tips (only these will be processed)
+# Note: These must be valid Telegram reaction emoji
+REACTION_SYMBOLS = {
+    "\U0001f525": 50,  # fire 🔥 - 50 RAMEN
+    "\u2764": 25,      # red heart ❤ - 25 RAMEN
 }
 
 POF_SYMBOLS = {

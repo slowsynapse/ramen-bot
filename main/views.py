@@ -22,7 +22,15 @@ class TelegramBotView(View):
         logger.info(data)
 
         handler = TelegramBotHandler(data)
-        handler.process_data()
+
+        # Route based on update type
+        if 'message_reaction' in data:
+            # Handle native Telegram emoji reactions (isolated feature)
+            handler.process_reaction()
+        elif 'message' in data:
+            # Handle regular messages (existing logic)
+            handler.process_data()
+
         handler.respond()
 
         return JsonResponse({"ok": "POST request processed"})

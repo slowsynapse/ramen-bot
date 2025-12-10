@@ -22,13 +22,16 @@ def handle_task_failure(**kw):
 
 
 @shared_task(rate_limit='20/s', queue='telegram')
-def send_telegram_message(message, chat_id, update_id):
+def send_telegram_message(message, chat_id, update_id, reply_to_message_id=None):
     """Send a message to Telegram chat."""
     data = {
         "chat_id": chat_id,
         "text": message,
         "parse_mode": "HTML",
     }
+    # Optionally reply to a specific message (for reaction tips)
+    if reply_to_message_id:
+        data["reply_to_message_id"] = reply_to_message_id
     url = 'https://api.telegram.org/bot'
     response = requests.post(
         f"{url}{settings.TELEGRAM_BOT_TOKEN}/sendMessage", data=data
